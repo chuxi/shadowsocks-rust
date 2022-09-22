@@ -66,6 +66,7 @@ default = [
     "local-socks4",
     "multi-threaded",
     "security-iv-printable-prefix",
+    "security-replay-attack-detect",
 ]
 
 # Enable local server
