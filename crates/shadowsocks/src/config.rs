@@ -173,6 +173,8 @@ pub struct ServerConfig {
 
     /// Weight
     weight: ServerWeight,
+
+    outbound_bind_interface: Option<String>,
 }
 
 impl ServerConfig {
@@ -199,6 +201,7 @@ impl ServerConfig {
             id: None,
             mode: Mode::TcpAndUdp, // Server serves TCP & UDP by default
             weight: ServerWeight::new(),
+            outbound_bind_interface: None,
         }
     }
 
@@ -323,6 +326,15 @@ impl ServerConfig {
     /// Set server's balancer weight
     pub fn set_weight(&mut self, weight: ServerWeight) {
         self.weight = weight;
+    }
+
+    pub fn outbound_bind_interface(&self) -> Option<&str> {
+        self.outbound_bind_interface.as_ref().map(AsRef::as_ref)
+    }
+
+    pub fn set_outbound_bind_interface<S>(&mut self, iface: S)
+    where S: Into<String>, {
+        self.outbound_bind_interface = Some(iface.into());
     }
 
     /// Get URL for QRCode

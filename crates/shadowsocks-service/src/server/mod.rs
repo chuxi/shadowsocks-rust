@@ -100,7 +100,12 @@ pub async fn run(config: Config) -> io::Result<()> {
             server.set_dns_resolver(r.clone());
         }
 
-        server.set_connect_opts(connect_opts.clone());
+        let mut svr_connect_opts = connect_opts.clone();
+        if let Some(iface) = server.config().outbound_bind_interface() {
+            svr_connect_opts.bind_interface = Some(iface.to_owned());
+        }
+
+        server.set_connect_opts(svr_connect_opts);
         server.set_accept_opts(accept_opts.clone());
 
         if let Some(c) = config.udp_max_associations {
