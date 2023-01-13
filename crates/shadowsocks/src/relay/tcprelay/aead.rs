@@ -43,7 +43,7 @@ use std::{
 use byte_string::ByteStr;
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::ready;
-use log::{debug, trace};
+use log::trace;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use crate::{
@@ -165,7 +165,6 @@ impl DecryptedReader {
                     self.state = DecryptReadState::BufferedData { pos: 0 };
                 }
                 DecryptReadState::BufferedData { ref mut pos } => {
-                    debug!("buffered data again, pos: {}, buffer len: {}", *pos, self.buffer.len());
                     if *pos < self.buffer.len() {
                         let buffered = &self.buffer[*pos..];
 
