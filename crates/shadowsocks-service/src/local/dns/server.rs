@@ -500,6 +500,7 @@ fn should_forward_by_query(context: &ServiceContext, balancer: &PingBalancer, qu
 }
 
 /// given the local response, determine whether remote response should be used instead
+#[allow(dead_code)]
 fn should_forward_by_response(
     acl: Option<&AccessControl>,
     local_response: &io::Result<Message>,
@@ -665,23 +666,11 @@ impl DnsClient {
                 trace!("pick remote response (query): {:?}", remote_response);
                 return (remote_response, true);
             }
-            Some(false) => {
+            Some(false) | None => {
                 let local_response = self.lookup_local(query, local_addr).await;
                 trace!("pick local response (query): {:?}", local_response);
                 return (local_response, false);
             }
-            None => (),
-        }
-
-        let local_response = self.lookup_local(query, local_addr).await;
-        if should_forward_by_response(self.context.acl(), &local_response, query) {
-            // forward remote
-            let remote_response = self.lookup_remote(query, remote_addr).await;
-            trace!("pick remote response (response): {:?}", remote_response);
-            (remote_response, true)
-        } else {
-            trace!("pick local response (response): {:?}", local_response);
-            (local_response, false)
         }
     }
 
