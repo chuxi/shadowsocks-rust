@@ -673,43 +673,15 @@ impl DnsClient {
             None => (),
         }
 
-        let decider = async {
-            let local_response = self.lookup_local(query, local_addr).await;
-            if should_forward_by_response(self.context.acl(), &local_response, query) {
-                None
-            } else {
-                Some(local_response)
-            }
-        };
-
-        let remote_response_fut = self.lookup_remote(query, remote_addr);
-        tokio::pin!(remote_response_fut, decider);
-
-        let mut use_remote = false;
-        let mut remote_response = None;
-        loop {
-            tokio::select! {
-                response = &mut remote_response_fut, if remote_response.is_none() => {
-                    if use_remote {
-                        trace!("pick remote response (response): {:?}", response);
-                        return (response, true);
-                    } else {
-                        remote_response = Some(response);
-                    }
-                }
-                decision = &mut decider, if !use_remote => {
-                    if let Some(local_response) = decision {
-                        trace!("pick local response (response): {:?}", local_response);
-                        return (local_response, false);
-                    } else if let Some(remote_response) = remote_response {
-                        trace!("pick remote response (response): {:?}", remote_response);
-                        return (remote_response, true);
-                    } else {
-                        use_remote = true;
-                    }
-                }
-                else => unreachable!(),
-            }
+        let local_response = self.lookup_local(query, local_addr).await;
+        if should_forward_by_response(self.context.acl(), &local_response, query) {
+            // forward remote
+            let remote_response = self.lookup_remote(query, remote_addr).await;
+            trace!("pick remote response (response): {:?}", remote_response);
+            (remote_response, true)
+        } else {
+            trace!("pick local response (response): {:?}", local_response);
+            (local_response, false)
         }
     }
 
@@ -815,28 +787,36 @@ impl DnsClient {
 
         match *local_addr {
             NameServerAddr::SocketAddr(ns) => {
-                // Query UDP then TCP
+                // Query UDP and TCP
+                match self.mode {
+                    Mode::TcpAndUdp => {
+                        let udp_query =
+                            self.client_cache
+                                .lookup_local(ns, message.clone(), self.context.connect_opts_ref(), true);
+                        let tcp_query = async move {
+                            // Send TCP query after 500ms, because UDP will always return faster than TCP, there is no need to send queries simutaneously
+                            time::sleep(Duration::from_millis(500)).await;
 
-                let udp_query =
-                    self.client_cache
-                        .lookup_local(ns, message.clone(), self.context.connect_opts_ref(), true);
-                let tcp_query = async move {
-                    // Send TCP query after 500ms, because UDP will always return faster than TCP, there is no need to send queries simutaneously
-                    time::sleep(Duration::from_millis(500)).await;
+                            self.client_cache
+                                .lookup_local(ns, message, self.context.connect_opts_ref(), false)
+                                .await
+                        };
 
-                    self.client_cache
-                        .lookup_local(ns, message, self.context.connect_opts_ref(), false)
-                        .await
-                };
+                        tokio::pin!(udp_query);
+                        tokio::pin!(tcp_query);
 
-                tokio::pin!(udp_query);
-                tokio::pin!(tcp_query);
-
-                match future::select(udp_query, tcp_query).await {
-                    Either::Left((Ok(m), ..)) => Ok(m),
-                    Either::Left((Err(..), next)) => next.await.map_err(From::from),
-                    Either::Right((Ok(m), ..)) => Ok(m),
-                    Either::Right((Err(..), next)) => next.await.map_err(From::from),
+                        match future::select(udp_query, tcp_query).await {
+                            Either::Left((Ok(m), ..)) => Ok(m),
+                            Either::Left((Err(..), next)) => next.await.map_err(From::from),
+                            Either::Right((Ok(m), ..)) => Ok(m),
+                            Either::Right((Err(..), next)) => next.await.map_err(From::from),
+                        }
+                    }
+                    Mode::UdpOnly | Mode::TcpOnly => {
+                        self.client_cache
+                            .lookup_local(ns, message.clone(), self.context.connect_opts_ref(), true)
+                            .await.map_err(From::from)
+                    }
                 }
             }
             #[cfg(unix)]
