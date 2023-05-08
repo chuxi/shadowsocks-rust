@@ -11,6 +11,7 @@
 //! +--------+-----------+-----------+
 //! ```
 
+use std::io;
 use std::io::Cursor;
 
 use byte_string::ByteStr;
@@ -26,6 +27,8 @@ use crate::{
 /// AEAD protocol error
 #[derive(thiserror::Error, Debug)]
 pub enum ProtocolError {
+    #[error(transparent)]
+    IoError(#[from] io::Error),
     #[error("packet too short for salt, at least {0} bytes, but only {1} bytes")]
     PacketTooShortForSalt(usize, usize),
     #[error("packet too short for tag, at least {0} bytes, but only {1} bytes")]
@@ -90,7 +93,7 @@ pub fn decrypt_payload_aead(
     }
 
     let (salt, data) = payload.split_at_mut(salt_len);
-    // context.check_nonce_replay(salt)?;
+    _context.check_nonce_replay(method, &salt)?;
 
     trace!("UDP packet got AEAD salt {:?}", ByteStr::new(salt));
 
