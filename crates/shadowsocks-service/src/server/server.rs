@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use std::borrow::BorrowMut;
 
 use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
 use log::{error, trace};

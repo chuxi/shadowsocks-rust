@@ -110,7 +110,7 @@ pub async fn run(config: Config) -> io::Result<()> {
         }
 
         let mut svr_connect_opts = connect_opts.clone();
-        if let Some(iface) = server.config().outbound_bind_interface() {
+        if let Some(iface) = server_builder.server_config().outbound_bind_interface() {
             svr_connect_opts.bind_interface = Some(iface.to_owned());
         }
 
