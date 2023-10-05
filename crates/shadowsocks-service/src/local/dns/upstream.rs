@@ -132,7 +132,7 @@ impl DnsClient {
                 let bytes = msg.to_vec()?;
                 socket.send(&bytes).await?;
 
-                let mut recv_buf = [0u8; 256];
+                let mut recv_buf = [0u8; 512];
                 let n = socket.recv(&mut recv_buf).await?;
 
                 Message::from_vec(&recv_buf[..n])
