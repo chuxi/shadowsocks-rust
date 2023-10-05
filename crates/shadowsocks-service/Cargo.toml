@@ -104,6 +104,8 @@ aead-cipher-2022-extra = ["shadowsocks/aead-cipher-2022-extra"]
 
 # Enable detection against replay attack
 security-replay-attack-detect = ["shadowsocks/security-replay-attack-detect"]
+# Enable IV printable prefix
+security-iv-printable-prefix = ["shadowsocks/security-iv-printable-prefix"]
 
 [dependencies]
 log = "0.4"
