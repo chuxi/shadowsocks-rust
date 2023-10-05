@@ -160,6 +160,8 @@ security-replay-attack-detect = [
 replay-attack-detect = [
     "security-replay-attack-detect",
 ] # Backward compatibility. DO NOT USE.
+# Enable IV printable prefix
+security-iv-printable-prefix = ["shadowsocks-service/security-iv-printable-prefix"]
 
 [dependencies]
 log = "0.4"
