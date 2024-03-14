@@ -516,6 +516,7 @@ fn should_forward_by_query(context: &ServiceContext, balancer: &PingBalancer, qu
 }
 
 /// given the local response, determine whether remote response should be used instead
+#[allow(dead_code)]
 fn should_forward_by_response(
     acl: Option<&AccessControl>,
     local_response: &io::Result<Message>,
@@ -673,60 +674,61 @@ impl DnsClient {
         remote_addr: &Address,
     ) -> (io::Result<Message>, bool) {
         // Start querying name servers
-        debug!("DNS lookup {:?} {}", query.query_type(), query.name());
 
-        match should_forward_by_query(&self.context, &self.balancer, query) {
+        return match should_forward_by_query(&self.context, &self.balancer, query) {
             Some(true) => {
+                debug!("remote DNS lookup {:?} {}", query.query_type(), query.name());
                 let remote_response = self.lookup_remote(query, remote_addr).await;
                 trace!("pick remote response (query): {:?}", remote_response);
-                return (remote_response, true);
+                (remote_response, true)
             }
-            Some(false) => {
+            _ => {
+                debug!("local DNS lookup {:?} {}", query.query_type(), query.name());
                 let local_response = self.lookup_local(query, local_addr).await;
                 trace!("pick local response (query): {:?}", local_response);
-                return (local_response, false);
+                (local_response, false)
             }
-            None => (),
+            // None => (),
         }
 
-        let decider = async {
-            let local_response = self.lookup_local(query, local_addr).await;
-            if should_forward_by_response(self.context.acl(), &local_response, query) {
-                None
-            } else {
-                Some(local_response)
-            }
-        };
-
-        let remote_response_fut = self.lookup_remote(query, remote_addr);
-        tokio::pin!(remote_response_fut, decider);
-
-        let mut use_remote = false;
-        let mut remote_response = None;
-        loop {
-            tokio::select! {
-                response = &mut remote_response_fut, if remote_response.is_none() => {
-                    if use_remote {
-                        trace!("pick remote response (response): {:?}", response);
-                        return (response, true);
-                    } else {
-                        remote_response = Some(response);
-                    }
-                }
-                decision = &mut decider, if !use_remote => {
-                    if let Some(local_response) = decision {
-                        trace!("pick local response (response): {:?}", local_response);
-                        return (local_response, false);
-                    } else if let Some(remote_response) = remote_response {
-                        trace!("pick remote response (response): {:?}", remote_response);
-                        return (remote_response, true);
-                    } else {
-                        use_remote = true;
-                    }
-                }
-                else => unreachable!(),
-            }
-        }
+        // let decider = async {
+        //     let local_response = self.lookup_local(query, local_addr).await;
+        //     if should_forward_by_response(self.context.acl(), &local_response, query) {
+        //         None
+        //     } else {
+        //         Some(local_response)
+        //     }
+        // };
+        //
+        // let remote_response_fut = self.lookup_remote(query, remote_addr);
+        // tokio::pin!(remote_response_fut, decider);
+        //
+        // let mut use_remote = false;
+        // let mut remote_response = None;
+        // loop {
+        //     tokio::select! {
+        //         response = &mut remote_response_fut, if remote_response.is_none() => {
+        //             if use_remote {
+        //                 trace!("pick remote response (response): {:?}", response);
+        //                 return (response, true);
+        //             } else {
+        //                 remote_response = Some(response);
+        //             }
+        //         }
+        //         decision = &mut decider, if !use_remote => {
+        //             if let Some(local_response) = decision {
+        //                 trace!("pick local response (response): {:?}", local_response);
+        //                 return (local_response, false);
+        //             } else if let Some(remote_response) = remote_response {
+        //                 trace!("pick remote response (response): {:?}", remote_response);
+        //                 return (remote_response, true);
+        //             } else {
+        //                 use_remote = true;
+        //             }
+        //         }
+        //         else => unreachable!(),
+        //     }
+        // }
     }
 
     async fn lookup_remote(&self, query: &Query, remote_addr: &Address) -> io::Result<Message> {
